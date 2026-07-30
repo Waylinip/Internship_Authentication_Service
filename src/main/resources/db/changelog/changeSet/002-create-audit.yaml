@@ -1,0 +1,18 @@
+databaseChangeLog:
+  - changeSet:
+      id: 2-add-audit
+      author: Danik
+      changes:
+        - addColumn:
+            tableName: users
+            columns:
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
