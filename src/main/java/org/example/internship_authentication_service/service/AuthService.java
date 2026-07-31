@@ -1,7 +1,9 @@
 package org.example.internship_authentication_service.service;
 
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.JwtException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.example.internship_authentication_service.dto.LoginRequest;
 import org.example.internship_authentication_service.dto.RegisterRequest;
 import org.example.internship_authentication_service.dto.TokenResponse;
@@ -13,6 +15,7 @@ import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AuthService {
@@ -68,5 +71,9 @@ public class AuthService {
         String newRefreshToken = jwtService.generateRefreshToken(user);
 
         return new TokenResponse(newAccessToken, newRefreshToken);
+    }
+    public void validate(String token) {
+        log.info("Validate token: {}", token);
+        if (!jwtService.validateToken(token)) throw new JwtException("Invalid token");
     }
 }

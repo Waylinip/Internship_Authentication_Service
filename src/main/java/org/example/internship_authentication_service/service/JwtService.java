@@ -8,10 +8,13 @@ import io.jsonwebtoken.security.Keys;
 import org.example.internship_authentication_service.entity.User;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import lombok.extern.slf4j.Slf4j;
+
 
 import javax.crypto.SecretKey;
 import java.util.Date;
 
+@Slf4j
 @Service
 public class JwtService {
 
@@ -58,6 +61,7 @@ public class JwtService {
             Claims claims = parseToken(token);
             return !claims.getExpiration().before(new Date());
         } catch (JwtException | IllegalArgumentException e) {
+            log.warn("JWT validation failed: {}", e.getMessage());
             return false;
         }
     }
