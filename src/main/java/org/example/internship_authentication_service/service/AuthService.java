@@ -36,7 +36,9 @@ public class AuthService {
     private final JwtService jwtService;
 
     public void register(RegisterRequest request) {
+        log.info("New registration request received for login '{}'", request.getLogin());
         if (userRepository.existsByLogin(request.getLogin())) {
+            log.warn("Registration rejected: login '{}' is already in use", request.getLogin());
             throw new UserAlreadyExistsException(USER_ALREADY_EXISTS);
         }
 
@@ -47,28 +49,38 @@ public class AuthService {
         user.setEnabled(true);
 
         userRepository.save(user);
+        log.info("User '{}' has been successfully registered", user.getLogin());
     }
 
     public TokenResponse login(LoginRequest request) {
+        log.info("User '{}' is trying to sign in", request.getLogin());
         User user = userRepository.findByLogin(request.getLogin())
-                .orElseThrow(() -> new BadCredentialsException(INVALID_CREDENTIALS));
+                .orElseThrow(() -> {
+                    log.warn("Sign in failed: user '{}' was not found", request.getLogin());
+                    return new BadCredentialsException(INVALID_CREDENTIALS);
+                });
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+            log.warn("Sign in failed: invalid password for user '{}'", user.getLogin());
             throw new BadCredentialsException(INVALID_CREDENTIALS);
         }
 
         if (!user.getEnabled()) {
+            log.warn("Sign in failed: user '{}' account is disabled", user.getLogin());
             throw new DisabledException(USER_DISABLED);
         }
 
         String accessToken = jwtService.generateAccessToken(user);
         String refreshToken = jwtService.generateRefreshToken(user);
 
+        log.info("User '{}' signed in successfully", user.getLogin());
         return new TokenResponse(accessToken, refreshToken);
     }
 
     public TokenResponse refresh(String refreshToken) {
+        log.info("Refreshing authentication tokens");
         if (!jwtService.validateToken(refreshToken)) {
+            log.warn("Token refresh failed: refresh token is invalid or expired");
             throw new BadCredentialsException(INVALID_REFRESH_TOKEN);
         }
 
@@ -84,8 +96,11 @@ public class AuthService {
         return new TokenResponse(newAccessToken, newRefreshToken);
     }
     public void validate(String token) {
-        log.info("Validate token: {}", token);
-        if (!jwtService.validateToken(token)) throw new JwtException(INVALID_TOKEN);
+        log.info("Validating JWT token");
+        if (!jwtService.validateToken(token)) {
+            log.warn("JWT validation failed: token is invalid");
+            throw new JwtException(INVALID_TOKEN);
+        }
     }
     public List<UserResponse> getAllUsers() {
         return userRepository.findAll().stream()
