@@ -10,6 +10,7 @@ import org.example.internship_authentication_service.dto.TokenResponse;
 import org.example.internship_authentication_service.dto.UserResponse;
 import org.example.internship_authentication_service.entity.Role;
 import org.example.internship_authentication_service.entity.User;
+import org.example.internship_authentication_service.exception.UserAlreadyExistsException;
 import org.example.internship_authentication_service.repository.UserRepository;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.DisabledException;
@@ -23,16 +24,20 @@ import java.util.List;
 @RequiredArgsConstructor
 public class AuthService {
 
-    public static final String USER_NOT_FOUND = "User not found";
-    public static final String INVALID_TOKEN = "Invalid token";
-    public static final String INVALID_LOGIN_OR_PASSWORD = "Invalid login or password";
+    private static final String INVALID_CREDENTIALS = "Invalid login or password";
+    private static final String USER_DISABLED = "User is deactivated";
+    private static final String USER_ALREADY_EXISTS = "Login already taken";
+    private static final String INVALID_TOKEN = "Invalid token";
+    private static final String INVALID_REFRESH_TOKEN = "Invalid or expired refresh token";
+    private static final String USER_NOT_FOUND = "User not found";
+
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
 
     public void register(RegisterRequest request) {
         if (userRepository.existsByLogin(request.getLogin())) {
-            throw new UserAlreadyExistsException("Login already taken");
+            throw new UserAlreadyExistsException(USER_ALREADY_EXISTS);
         }
 
         User user = new User();
@@ -46,14 +51,14 @@ public class AuthService {
 
     public TokenResponse login(LoginRequest request) {
         User user = userRepository.findByLogin(request.getLogin())
-                .orElseThrow(() -> new BadCredentialsException(INVALID_LOGIN_OR_PASSWORD));
+                .orElseThrow(() -> new BadCredentialsException(INVALID_CREDENTIALS));
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-            throw new BadCredentialsException(INVALID_LOGIN_OR_PASSWORD);
+            throw new BadCredentialsException(INVALID_CREDENTIALS);
         }
 
         if (!user.getEnabled()) {
-            throw new DisabledException("User is deactivated");
+            throw new DisabledException(USER_DISABLED);
         }
 
         String accessToken = jwtService.generateAccessToken(user);
@@ -64,7 +69,7 @@ public class AuthService {
 
     public TokenResponse refresh(String refreshToken) {
         if (!jwtService.validateToken(refreshToken)) {
-            throw new BadCredentialsException("Invalid or expired refresh token");
+            throw new BadCredentialsException(INVALID_REFRESH_TOKEN);
         }
 
         Claims claims = jwtService.parseToken(refreshToken);
