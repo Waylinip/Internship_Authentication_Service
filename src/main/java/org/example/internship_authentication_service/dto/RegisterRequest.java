@@ -12,6 +12,7 @@ import lombok.Setter;
 @NoArgsConstructor
 @AllArgsConstructor
 public class RegisterRequest {
+
     @NotBlank(message = "Login is required")
     @Size(min = 3, max = 50, message = "Login must be between 3 and 50 characters")
     private String login;
