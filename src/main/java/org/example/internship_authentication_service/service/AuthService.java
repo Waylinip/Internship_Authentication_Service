@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.example.internship_authentication_service.dto.LoginRequest;
 import org.example.internship_authentication_service.dto.RegisterRequest;
 import org.example.internship_authentication_service.dto.TokenResponse;
+import org.example.internship_authentication_service.dto.UserResponse;
 import org.example.internship_authentication_service.entity.Role;
 import org.example.internship_authentication_service.entity.User;
 import org.example.internship_authentication_service.exception.UserAlreadyExistsException;
@@ -15,6 +16,8 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
 
 @Slf4j
 @Service
@@ -32,7 +35,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
 
-    public void register(RegisterRequest request) {
+    public TokenResponse register(RegisterRequest request) {
         log.info("New registration request received for login '{}'", request.getLogin());
         if (userRepository.existsByLogin(request.getLogin())) {
             log.warn("Registration rejected: login '{}' is already in use", request.getLogin());
@@ -47,6 +50,10 @@ public class AuthService {
 
         userRepository.save(user);
         log.info("User '{}' has been successfully registered", user.getLogin());
+
+        String accessToken = jwtService.generateAccessToken(user);
+        String refreshToken = jwtService.generateRefreshToken(user);
+        return new TokenResponse(accessToken, refreshToken);
     }
 
     public TokenResponse login(LoginRequest request) {
@@ -63,6 +70,7 @@ public class AuthService {
         }
 
         if (!user.getEnabled()) {
+            log.warn("Sign in failed: user '{}' account is disabled", user.getLogin());
             throw new DisabledException(USER_DISABLED);
         }
 
@@ -70,7 +78,6 @@ public class AuthService {
         String refreshToken = jwtService.generateRefreshToken(user);
 
         log.info("User '{}' signed in successfully", user.getLogin());
-
         return new TokenResponse(accessToken, refreshToken);
     }
 
@@ -78,31 +85,57 @@ public class AuthService {
         log.info("Refreshing authentication tokens");
         if (!jwtService.validateToken(refreshToken)) {
             log.warn("Token refresh failed: refresh token is invalid or expired");
-            throw new JwtException(INVALID_REFRESH_TOKEN);
+            throw new BadCredentialsException(INVALID_REFRESH_TOKEN);
         }
 
         Claims claims = jwtService.parseToken(refreshToken);
+        String tokenType = claims.get("token_type", String.class);
+
+        if (!"refresh".equals(tokenType)) {
+            throw new BadCredentialsException(INVALID_REFRESH_TOKEN);
+        }
         Long userId = Long.parseLong(claims.getSubject());
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BadCredentialsException(USER_NOT_FOUND));
-
-        if (!user.getEnabled()) {
-            log.warn("Token refresh denied: user '{}' account is disabled", user.getLogin());
-            throw new DisabledException(USER_DISABLED);
-        }
 
         String newAccessToken = jwtService.generateAccessToken(user);
         String newRefreshToken = jwtService.generateRefreshToken(user);
 
         return new TokenResponse(newAccessToken, newRefreshToken);
     }
-
     public void validate(String token) {
         log.info("Validating JWT token");
         if (!jwtService.validateToken(token)) {
             log.warn("JWT validation failed: token is invalid");
             throw new JwtException(INVALID_TOKEN);
         }
+    }
+    public List<UserResponse> getAllUsers() {
+        return userRepository.findAll().stream()
+                .map(user -> new UserResponse(user.getId(), user.getLogin(), user.getRole(), user.getEnabled()))
+                .toList();
+    }
+
+    public void activate(Long id) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new BadCredentialsException(USER_NOT_FOUND));
+        user.setEnabled(true);
+        userRepository.save(user);
+    }
+
+    public void deactivate(Long id) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new BadCredentialsException(USER_NOT_FOUND));
+        user.setEnabled(false);
+        userRepository.save(user);
+    }
+
+
+    public void makeAdmin(String login) {
+        User user = userRepository.findByLogin(login)
+                .orElseThrow(() -> new BadCredentialsException(USER_NOT_FOUND));
+        user.setRole(Role.ROLE_ADMIN);
+        userRepository.save(user);
     }
 }
