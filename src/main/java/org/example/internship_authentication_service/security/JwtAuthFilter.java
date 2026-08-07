@@ -38,6 +38,13 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             String token = header.substring(7);
             try {
                 Claims claims = jwtUtil.parseToken(token);
+                String tokenType = claims.get("token_type", String.class);
+
+                if (!"access".equals(tokenType)) {
+                    SecurityContextHolder.clearContext();
+                    filterChain.doFilter(request, response);
+                    return;
+                }
                 Long userId = Long.parseLong(claims.getSubject());
                 String role = claims.get("role", String.class);
                 List<GrantedAuthority> authorities =
