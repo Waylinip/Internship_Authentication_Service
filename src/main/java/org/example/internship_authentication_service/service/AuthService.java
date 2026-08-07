@@ -35,7 +35,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
 
-    public void register(RegisterRequest request) {
+    public TokenResponse register(RegisterRequest request) {
         log.info("New registration request received for login '{}'", request.getLogin());
         if (userRepository.existsByLogin(request.getLogin())) {
             log.warn("Registration rejected: login '{}' is already in use", request.getLogin());
@@ -50,6 +50,10 @@ public class AuthService {
 
         userRepository.save(user);
         log.info("User '{}' has been successfully registered", user.getLogin());
+
+        String accessToken = jwtService.generateAccessToken(user);
+        String refreshToken = jwtService.generateRefreshToken(user);
+        return new TokenResponse(accessToken, refreshToken);
     }
 
     public TokenResponse login(LoginRequest request) {
@@ -85,6 +89,11 @@ public class AuthService {
         }
 
         Claims claims = jwtService.parseToken(refreshToken);
+        String tokenType = claims.get("token_type", String.class);
+
+        if (!"refresh".equals(tokenType)) {
+            throw new BadCredentialsException(INVALID_REFRESH_TOKEN);
+        }
         Long userId = Long.parseLong(claims.getSubject());
 
         User user = userRepository.findById(userId)
@@ -119,6 +128,14 @@ public class AuthService {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new BadCredentialsException(USER_NOT_FOUND));
         user.setEnabled(false);
+        userRepository.save(user);
+    }
+
+
+    public void makeAdmin(String login) {
+        User user = userRepository.findByLogin(login)
+                .orElseThrow(() -> new BadCredentialsException(USER_NOT_FOUND));
+        user.setRole(Role.ROLE_ADMIN);
         userRepository.save(user);
     }
 }
