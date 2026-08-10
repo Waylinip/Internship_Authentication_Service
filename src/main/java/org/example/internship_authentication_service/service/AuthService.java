@@ -4,18 +4,19 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.example.internship_authentication_service.dto.LoginRequest;
-import org.example.internship_authentication_service.dto.RegisterRequest;
-import org.example.internship_authentication_service.dto.TokenResponse;
-import org.example.internship_authentication_service.dto.UserResponse;
+import org.example.internship_authentication_service.client.UserServiceClient;
+import org.example.internship_authentication_service.dto.*;
 import org.example.internship_authentication_service.entity.Role;
 import org.example.internship_authentication_service.entity.User;
+import org.example.internship_authentication_service.exception.ProfileCreationException;
 import org.example.internship_authentication_service.exception.UserAlreadyExistsException;
 import org.example.internship_authentication_service.repository.UserRepository;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestClientException;
 
 import java.util.List;
 
@@ -34,12 +35,13 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final UserServiceClient userServiceClient;
 
+
+    @Transactional
     public TokenResponse register(RegisterRequest request) {
-        log.info("New registration request received for login '{}'", request.getLogin());
         if (userRepository.existsByLogin(request.getLogin())) {
-            log.warn("Registration rejected: login '{}' is already in use", request.getLogin());
-            throw new UserAlreadyExistsException(USER_ALREADY_EXISTS);
+            throw new IllegalArgumentException("Login already taken");
         }
 
         User user = new User();
@@ -47,9 +49,20 @@ public class AuthService {
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setRole(Role.ROLE_USER);
         user.setEnabled(true);
+        User savedUser = userRepository.save(user);
 
-        userRepository.save(user);
-        log.info("User '{}' has been successfully registered", user.getLogin());
+        try {
+            userServiceClient.createProfile(new UserProfileRequest(
+                    savedUser.getId(),
+                    request.getName(),
+                    request.getSurname(),
+                    request.getBirthdate(),
+                    request.getEmail()
+            ));
+        } catch (RestClientException e) {
+            log.error("Failed to create profile in user-service for authUserId={}", savedUser.getId(), e);
+            throw new ProfileCreationException("Registration failed, please try again");
+        }
 
         String accessToken = jwtService.generateAccessToken(user);
         String refreshToken = jwtService.generateRefreshToken(user);
@@ -104,6 +117,7 @@ public class AuthService {
 
         return new TokenResponse(newAccessToken, newRefreshToken);
     }
+
     public void validate(String token) {
         log.info("Validating JWT token");
         if (!jwtService.validateToken(token)) {
@@ -111,6 +125,7 @@ public class AuthService {
             throw new JwtException(INVALID_TOKEN);
         }
     }
+
     public List<UserResponse> getAllUsers() {
         return userRepository.findAll().stream()
                 .map(user -> new UserResponse(user.getId(), user.getLogin(), user.getRole(), user.getEnabled()))
