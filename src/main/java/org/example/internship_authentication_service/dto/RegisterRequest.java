@@ -1,11 +1,12 @@
 package org.example.internship_authentication_service.dto;
 
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+
+import java.time.LocalDate;
 
 @Getter
 @Setter
@@ -20,4 +21,20 @@ public class RegisterRequest {
     @NotBlank(message = "Password is required")
     @Size(min = 8, message = "Password must be at least 8 characters")
     private String password;
+
+    @NotBlank
+    @Size(min = 2, max = 50)
+    private String name;
+
+    @NotBlank
+    @Size(min = 2, max = 50)
+    private String surname;
+
+    @NotNull
+    @Past
+    private LocalDate birthdate;
+
+    @NotBlank
+    @Email
+    private String email;
 }
