@@ -28,20 +28,21 @@ public class JwtService {
     private long refreshExpiration;
 
     public String generateAccessToken(User user) {
-        return generateToken(user, accessExpiration);
+        return generateToken(user, accessExpiration, "access");
     }
 
     public String generateRefreshToken(User user) {
-        return generateToken(user, refreshExpiration);
+        return generateToken(user, refreshExpiration, "refresh");
     }
 
-    private String generateToken(User user, long expiration) {
+    private String generateToken(User user, long expiration, String tokenType) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + expiration);
 
         return Jwts.builder()
                 .subject(user.getId().toString())
                 .claim("role", user.getRole().name())
+                .claim("token_type", tokenType)
                 .issuedAt(now)
                 .expiration(expiryDate)
                 .signWith(getSigningKey())

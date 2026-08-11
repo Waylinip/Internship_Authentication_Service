@@ -3,6 +3,7 @@ package org.example.internship_authentication_service.controller;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.example.internship_authentication_service.dto.*;
+import org.example.internship_authentication_service.entity.Role;
 import org.example.internship_authentication_service.service.AuthService;
 import org.example.internship_authentication_service.service.JwtService;
 import org.springframework.http.HttpStatus;
@@ -18,13 +19,18 @@ public class AuthController {
 
     private final AuthService authService;
 
+    @PostMapping("/register")
+    public ResponseEntity<TokenResponse> register(@Valid @RequestBody RegisterRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(authService.register(request));
+    }
 
     @PreAuthorize("hasRole('ADMIN')")
-    @PostMapping("/register")
-    public ResponseEntity<Void> register(@Valid @RequestBody RegisterRequest request) {
-        authService.register(request);
-        return ResponseEntity.status(HttpStatus.CREATED).build();
+    @PutMapping("/admin")
+    public ResponseEntity<Void> makeAdmin(@RequestParam String login) {
+        authService.makeAdmin(login);
+        return ResponseEntity.ok().build();
     }
+
 
     @PostMapping("/login")
     public ResponseEntity<TokenResponse> login(@Valid @RequestBody LoginRequest request) {
