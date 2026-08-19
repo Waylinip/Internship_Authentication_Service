@@ -20,4 +20,10 @@ public class UserServiceClient {
                 .retrieve()
                 .toBodilessEntity();
     }
+    public void rollbackProfile(Long authUserId) {
+        userServiceRestClient.delete()
+                .uri("/api/internal/users/{authUserId}", authUserId)
+                .retrieve()
+                .toBodilessEntity();
+    }
 }
